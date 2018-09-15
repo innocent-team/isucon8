@@ -95,12 +95,15 @@ def teardown(error):
         flask.g.db.close()
 
 
-def get_events(filter=lambda e: True):
+def get_events(only_public=False, filter=lambda e: True):
     conn = dbh()
     conn.autocommit(False)
     cur = conn.cursor()
     try:
-        cur.execute("SELECT * FROM events ORDER BY id ASC")
+        if only_public:
+            cur.execute("SELECT * FROM events WHERE public_fg = 1 ORDER BY id ASC")
+        else:
+            cur.execute("SELECT * FROM events ORDER BY id ASC")
         rows = cur.fetchall()
         event_ids = [row['id'] for row in rows if filter(row)]
         events = []
@@ -219,7 +222,7 @@ def render_report_csv(reports):
 def get_index():
     user = get_login_user()
     events = []
-    for event in get_events(lambda e: e["public_fg"]):
+    for event in get_events(True):
         events.append(sanitize_event(event))
     return flask.render_template('index.html', user=user, events=events, base_url=make_base_url(flask.request))
 
@@ -343,7 +346,7 @@ def post_logout():
 @app.route('/api/events')
 def get_events_api():
     events = []
-    for event in get_events(lambda e: e["public_fg"]):
+    for event in get_events(True):
         events.append(sanitize_event(event))
     return jsonify(events)
 
