@@ -150,8 +150,8 @@ def get_event(event_id, login_user_id=None):
         ON r.event_id = %s
         AND s.id = r.sheet_id
         AND r.canceled_at IS NULL
-        GROUP BY r.event_id, r.sheet_id
-        HAVING r.reserved_at = MIN(r.reserved_at)
+        GROUP BY s.id
+        HAVING IFNULL(r.reserved_at = MIN(r.reserved_at), TRUE)
         ORDER BY s.`rank`, s.num
     """, [event['id']])
     sheets = cur.fetchall()
@@ -166,6 +166,11 @@ def get_event(event_id, login_user_id=None):
             event['sheets'][sheet['rank']]['remains'] += 1
 
         event['sheets'][sheet['rank']]['detail'].append(sheet)
+
+        del sheet['user_id']
+
+        if sheet['reserved_at'] is None:
+            del sheet['reserved_at']
 
         del sheet['id']
         del sheet['price']
