@@ -125,36 +125,42 @@ def get_event(event_id, login_user_id=None):
     event = cur.fetchone()
     if not event: return None
 
-    event["total"] = 0
+    cur.execute("select count(*) as total from sheets")
+    total = cur.fetchone()['total']
+    event["total"] = total
     event["remains"] = 0
     event["sheets"] = {}
-    for rank in ["S", "A", "B", "C"]:
-        event["sheets"][rank] = {'total': 0, 'remains': 0, 'detail': []}
 
-    cur.execute("SELECT * FROM sheets ORDER BY `rank`, num")
+    cur.execute("""
+        select `rank`, count(*) as total, price 
+        from sheets
+        group by 1
+        order by `rank`, num
+    """)
+    total_rank = cur.fetchall()
+    for rank in total_rank:
+        event["sheets"][rank['rank']] = {
+            'total': rank['total'], 'remains': 0, 'detail': [], 'price': event['price'] + rank['price']
+        }
+
+    cur.execute("""
+        SELECT s.*, r.user_id, r.reserved_at
+        FROM sheets s
+        LEFT JOIN reservations r
+        ON r.event_id = %s
+        AND s.id = r.sheet_id
+        AND r.canceled_at IS NULL
+        GROUP BY r.event_id, r.sheet_id
+        HAVING r.reserved_at = MIN(r.reserved_at)
+        ORDER BY s.`rank`, s.num
+    """, [event['id']])
     sheets = cur.fetchall()
     for sheet in sheets:
-        if not event['sheets'][sheet['rank']].get('price'):
-            event['sheets'][sheet['rank']]['price'] = event['price'] + sheet['price']
-        event['total'] += 1
-        event['sheets'][sheet['rank']]['total'] += 1
-
-        cur.execute("""
-            SELECT * FROM reservations
-            WHERE
-                event_id = %s
-                AND sheet_id = %s
-                AND canceled_at IS NULL
-            GROUP BY event_id, sheet_id
-            HAVING reserved_at = MIN(reserved_at)
-            """,
-            [event['id'], sheet['id']])
-        reservation = cur.fetchone()
-        if reservation:
-            if login_user_id and reservation['user_id'] == login_user_id:
+        if sheet['user_id']:
+            if login_user_id and sheet['user_id'] == login_user_id:
                 sheet['mine'] = True
             sheet['reserved'] = True
-            sheet['reserved_at'] = int(reservation['reserved_at'].replace(tzinfo=timezone.utc).timestamp())
+            sheet['reserved_at'] = int(sheet['reserved_at'].replace(tzinfo=timezone.utc).timestamp())
         else:
             event['remains'] += 1
             event['sheets'][sheet['rank']]['remains'] += 1
