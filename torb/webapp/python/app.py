@@ -95,6 +95,23 @@ def teardown(error):
         flask.g.db.close()
 
 
+def event_exist(event_id):
+    cur = dbh().cursor()
+    cur.execute("SELECT 1 FROM events WHERE id = %s", [event_id])
+    event = cur.fetchone()
+    return event
+
+def event_exist_and_public(event_id):
+    cur = dbh().cursor()
+    cur.execute("SELECT id, public_fg FROM events WHERE id = %s", [event_id])
+    event = cur.fetchone()
+
+    if not event:
+        return False
+
+    return bool(event['public_fg'])
+
+
 def get_events(only_public=False):
     conn = dbh()
     conn.autocommit(False)
@@ -108,9 +125,7 @@ def get_events(only_public=False):
         event_ids = [row['id'] for row in rows]
         events = []
         for event_id in event_ids:
-            event = get_event(event_id)
-            for sheet in event['sheets'].values():
-                del sheet['detail']
+            event = get_event(event_id, with_detail=False)
             events.append(event)
         conn.commit()
     except MySQLdb.Error as e:
@@ -119,7 +134,7 @@ def get_events(only_public=False):
     return events
 
 
-def get_event(event_id, login_user_id=None):
+def get_event(event_id, login_user_id=None, with_detail=True):
     cur = dbh().cursor()
     cur.execute("SELECT * FROM events WHERE id = %s", [event_id])
     event = cur.fetchone()
@@ -139,9 +154,14 @@ def get_event(event_id, login_user_id=None):
     """)
     total_rank = cur.fetchall()
     for rank in total_rank:
-        event["sheets"][rank['rank']] = {
-            'total': rank['total'], 'remains': 0, 'detail': [], 'price': event['price'] + rank['price']
-        }
+        if with_detail:
+            event["sheets"][rank['rank']] = {
+                'total': rank['total'], 'remains': 0, 'detail': [], 'price': event['price'] + rank['price']
+            }
+        else:
+            event["sheets"][rank['rank']] = {
+                'total': rank['total'], 'remains': 0, 'price': event['price'] + rank['price']
+            }
 
     cur.execute("""
         SELECT s.*, r.user_id, r.reserved_at
@@ -157,24 +177,26 @@ def get_event(event_id, login_user_id=None):
     sheets = cur.fetchall()
     for sheet in sheets:
         if sheet['user_id']:
-            if login_user_id and sheet['user_id'] == login_user_id:
-                sheet['mine'] = True
-            sheet['reserved'] = True
-            sheet['reserved_at'] = int(sheet['reserved_at'].replace(tzinfo=timezone.utc).timestamp())
+            if with_detail:
+                if login_user_id and sheet['user_id'] == login_user_id:
+                    sheet['mine'] = True
+                sheet['reserved'] = True
+                sheet['reserved_at'] = int(sheet['reserved_at'].replace(tzinfo=timezone.utc).timestamp())
         else:
             event['remains'] += 1
             event['sheets'][sheet['rank']]['remains'] += 1
 
-        event['sheets'][sheet['rank']]['detail'].append(sheet)
+        if with_detail:
+            event['sheets'][sheet['rank']]['detail'].append(sheet)
 
-        del sheet['user_id']
+            del sheet['user_id']
 
-        if sheet['reserved_at'] is None:
-            del sheet['reserved_at']
+            if sheet['reserved_at'] is None:
+                del sheet['reserved_at']
 
-        del sheet['id']
-        del sheet['price']
-        del sheet['rank']
+            del sheet['id']
+            del sheet['price']
+            del sheet['rank']
 
     event['public'] = True if event['public_fg'] else False
     event['closed'] = True if event['closed_fg'] else False
@@ -210,10 +232,7 @@ def get_login_administrator():
 
 
 def validate_rank(rank):
-    cur = dbh().cursor()
-    cur.execute("SELECT COUNT(*) AS total_sheets FROM sheets WHERE `rank` = %s", [rank])
-    ret = cur.fetchone()
-    return int(ret['total_sheets']) > 0
+    return rank in set('SABC')
 
 
 def render_report_csv(reports):
@@ -349,9 +368,7 @@ def get_users(user_id):
     rows = cur.fetchall()
     recent_events = []
     for row in rows:
-        event = get_event(row['event_id'])
-        for sheet in event['sheets'].values():
-            del sheet['detail']
+        event = get_event(row['event_id'], with_detail=False)
         recent_events.append(event)
     user['recent_events'] = recent_events
 
@@ -411,9 +428,8 @@ def post_reserve(event_id):
     rank = flask.request.json["sheet_rank"]
 
     user = get_login_user()
-    event = get_event(event_id, user['id'])
 
-    if not event or not event['public']:
+    if not event_exist_and_public(event_id):
         return res_error("invalid_event", 404)
     if not validate_rank(rank):
         return res_error("invalid_rank", 400)
@@ -439,7 +455,7 @@ def post_reserve(event_id):
             ORDER BY RAND()
             LIMIT 1
             """,
-            [event['id'], rank])
+            [event_id, rank])
         sheet = cur.fetchone()
         if not sheet:
             return res_error("sold_out", 409)
@@ -448,7 +464,7 @@ def post_reserve(event_id):
             cur = conn.cursor()
             cur.execute(
                 "INSERT INTO reservations (event_id, sheet_id, user_id, reserved_at) VALUES (%s, %s, %s, %s)",
-                [event['id'], sheet['id'], user['id'], datetime.utcnow().strftime("%F %T.%f")])
+                [event_id, sheet['id'], user['id'], datetime.utcnow().strftime("%F %T.%f")])
             reservation_id = cur.lastrowid
             conn.commit()
         except MySQLdb.Error as e:
@@ -467,9 +483,8 @@ def post_reserve(event_id):
 @login_required
 def delete_reserve(event_id, rank, num):
     user = get_login_user()
-    event = get_event(event_id, user['id'])
 
-    if not event or not event['public']:
+    if not event_exist_and_public(event_id):
         return res_error("invalid_event", 404)
     if not validate_rank(rank):
         return res_error("invalid_rank", 404)
@@ -495,7 +510,7 @@ def delete_reserve(event_id, rank, num):
             HAVING reserved_at = MIN(reserved_at)
             FOR UPDATE
             """,
-            [event['id'], sheet['id']])
+            [event_id, sheet['id']])
         reservation = cur.fetchone()
 
         if not reservation:
@@ -621,7 +636,8 @@ def post_event_edit(event_id):
 @app.route('/admin/api/reports/events/<int:event_id>/sales')
 @admin_login_required
 def get_admin_event_sales(event_id):
-    event = get_event(event_id)
+    if not event_exist(event_id):
+        return res_error("not_found", 404)
 
     cur = dbh().cursor()
     reservations = cur.execute('''
@@ -633,7 +649,7 @@ def get_admin_event_sales(event_id):
             r.event_id = %s
         ORDER BY reserved_at ASC
         FOR UPDATE''',
-        [event['id']])
+        [event_id])
     reservations = cur.fetchall()
     reports = []
 
@@ -643,7 +659,7 @@ def get_admin_event_sales(event_id):
         else: canceled_at = ''
         reports.append({
             "reservation_id": reservation['id'],
-            "event_id":       event['id'],
+            "event_id":       event_id,
             "rank":           reservation['sheet_rank'],
             "num":            reservation['sheet_num'],
             "user_id":        reservation['user_id'],
