@@ -139,8 +139,15 @@ def get_event(event_id, login_user_id=None):
         event['total'] += 1
         event['sheets'][sheet['rank']]['total'] += 1
 
-        cur.execute(
-            "SELECT * FROM reservations WHERE event_id = %s AND sheet_id = %s AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)",
+        cur.execute("""
+            SELECT * FROM reservations
+            WHERE
+                event_id = %s
+                AND sheet_id = %s
+                AND canceled_at IS NULL
+            GROUP BY event_id, sheet_id
+            HAVING reserved_at = MIN(reserved_at)
+            """,
             [event['id'], sheet['id']])
         reservation = cur.fetchone()
         if reservation:
@@ -269,8 +276,16 @@ def get_users(user_id):
     if user['id'] != get_login_user()['id']:
         return ('', 403)
 
-    cur.execute(
-        "SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id WHERE r.user_id = %s ORDER BY IFNULL(r.canceled_at, r.reserved_at) DESC LIMIT 5",
+    cur.execute("""
+        SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num
+        FROM reservations r
+        INNER JOIN sheets s
+        ON s.id = r.sheet_id
+        WHERE
+            r.user_id = %s
+        ORDER BY IFNULL(r.canceled_at, r.reserved_at)
+        DESC LIMIT 5
+        """,
         [user['id']])
     recent_reservations = []
     for row in cur.fetchall():
@@ -296,14 +311,29 @@ def get_users(user_id):
         })
 
     user['recent_reservations'] = recent_reservations
-    cur.execute(
-        "SELECT IFNULL(SUM(e.price + s.price), 0) AS total_price FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id INNER JOIN events e ON e.id = r.event_id WHERE r.user_id = %s AND r.canceled_at IS NULL",
+    cur.execute("""
+        SELECT IFNULL(SUM(e.price + s.price), 0) AS total_price
+        FROM reservations r
+        INNER JOIN sheets s
+        ON s.id = r.sheet_id
+        INNER JOIN events e
+        ON e.id = r.event_id
+        WHERE
+            r.user_id = %s
+            AND r.canceled_at IS NULL
+        """,
         [user['id']])
     row = cur.fetchone()
     user['total_price'] = int(row['total_price'])
 
-    cur.execute(
-        "SELECT event_id FROM reservations WHERE user_id = %s GROUP BY event_id ORDER BY MAX(IFNULL(canceled_at, reserved_at)) DESC LIMIT 5",
+    cur.execute("""
+        SELECT event_id
+        FROM reservations
+        WHERE user_id = %s
+        GROUP BY event_id
+        ORDER BY MAX(IFNULL(canceled_at, reserved_at))
+        DESC LIMIT 5
+        """,
         [user['id']])
     rows = cur.fetchall()
     recent_events = []
@@ -383,8 +413,21 @@ def post_reserve(event_id):
     while True:
         conn =  dbh()
         cur = conn.cursor()
-        cur.execute(
-            "SELECT * FROM sheets WHERE id NOT IN (SELECT sheet_id FROM reservations WHERE event_id = %s AND canceled_at IS NULL FOR UPDATE) AND `rank` =%s ORDER BY RAND() LIMIT 1",
+        cur.execute("""
+            SELECT * FROM sheets
+            WHERE
+                id NOT IN (
+                    SELECT sheet_id
+                    FROM reservations
+                    WHERE
+                        event_id = %s
+                        AND canceled_at IS NULL
+                    FOR UPDATE
+                )
+                AND `rank` =%s
+            ORDER BY RAND()
+            LIMIT 1
+            """,
             [event['id'], rank])
         sheet = cur.fetchone()
         if not sheet:
@@ -431,8 +474,16 @@ def delete_reserve(event_id, rank, num):
         conn.autocommit(False)
         cur = conn.cursor()
 
-        cur.execute(
-            "SELECT * FROM reservations WHERE event_id = %s AND sheet_id = %s AND canceled_at IS NULL GROUP BY event_id HAVING reserved_at = MIN(reserved_at) FOR UPDATE",
+        cur.execute("""
+            SELECT * FROM reservations
+            WHERE
+                event_id = %s
+                AND sheet_id = %s
+                AND canceled_at IS NULL
+            GROUP BY event_id
+            HAVING reserved_at = MIN(reserved_at)
+            FOR UPDATE
+            """,
             [event['id'], sheet['id']])
         reservation = cur.fetchone()
 
@@ -562,8 +613,15 @@ def get_admin_event_sales(event_id):
     event = get_event(event_id)
 
     cur = dbh().cursor()
-    reservations = cur.execute(
-        'SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num, s.price AS sheet_price, e.price AS event_price FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = %s ORDER BY reserved_at ASC FOR UPDATE',
+    reservations = cur.execute('''
+        SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num, s.price AS sheet_price, e.price AS event_price
+        FROM reservations r
+        INNER JOIN sheets s ON s.id = r.sheet_id
+        INNER JOIN events e ON e.id = r.event_id
+        WHERE
+            r.event_id = %s
+        ORDER BY reserved_at ASC
+        FOR UPDATE''',
         [event['id']])
     reservations = cur.fetchall()
     reports = []
