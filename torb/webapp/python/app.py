@@ -608,5 +608,11 @@ def get_admin_sales():
     return render_report_csv(reports)
 
 
+from wsgi_lineprof.middleware import LineProfilerMiddleware
+from wsgi_lineprof.filters import FilenameFilter, TotalTimeSorter
+from wsgiref.simple_server import make_server
+profile_app = LineProfilerMiddleware(app, filters=[FilenameFilter("app.py"), TotalTimeSorter()], stream=open('lineprof.log', 'w'))
+
+
 if __name__ == "__main__":
     app.run(port=8080, debug=True, threaded=True)
