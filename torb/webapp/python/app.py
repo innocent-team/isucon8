@@ -1,3 +1,4 @@
+import MySQLdb
 import MySQLdb.cursors
 import flask
 import functools
@@ -640,17 +641,23 @@ def get_admin_event_sales(event_id):
         return res_error("not_found", 404)
 
     cur = dbh().cursor()
-    reservations = cur.execute('''
-        SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num, s.price AS sheet_price, e.price AS event_price
-        FROM reservations r
-        INNER JOIN sheets s ON s.id = r.sheet_id
-        INNER JOIN events e ON e.id = r.event_id
-        WHERE
-            r.event_id = %s
-        ORDER BY reserved_at ASC
-        FOR UPDATE''',
-        [event_id])
-    reservations = cur.fetchall()
+    for i in range(3):
+        try:
+            reservations = cur.execute('''
+                SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num, s.price AS sheet_price, e.price AS event_price
+                FROM reservations r
+                INNER JOIN sheets s ON s.id = r.sheet_id
+                INNER JOIN events e ON e.id = r.event_id
+                WHERE
+                    r.event_id = %s
+                ORDER BY reserved_at ASC
+                FOR UPDATE''',
+                [event_id])
+            reservations = cur.fetchall()
+            break
+        except MySQLdb.Error as e:
+            if i == 2:
+                raise e
     reports = []
 
     for reservation in reservations:
