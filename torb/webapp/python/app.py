@@ -95,7 +95,7 @@ def teardown(error):
         flask.g.db.close()
 
 
-def get_events(only_public=False, filter=lambda e: True):
+def get_events(only_public=False):
     conn = dbh()
     conn.autocommit(False)
     cur = conn.cursor()
@@ -105,7 +105,7 @@ def get_events(only_public=False, filter=lambda e: True):
         else:
             cur.execute("SELECT * FROM events ORDER BY id ASC")
         rows = cur.fetchall()
-        event_ids = [row['id'] for row in rows if filter(row)]
+        event_ids = [row['id'] for row in rows]
         events = []
         for event_id in event_ids:
             event = get_event(event_id)
