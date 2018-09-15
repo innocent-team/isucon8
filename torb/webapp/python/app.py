@@ -475,7 +475,7 @@ def delete_reserve(event_id, rank, num):
         return res_error("invalid_rank", 404)
 
     cur = dbh().cursor()
-    cur.execute('SELECT 1 FROM sheets WHERE `rank` = %s AND num = %s', [rank, num])
+    cur.execute('SELECT * FROM sheets WHERE `rank` = %s AND num = %s', [rank, num])
     sheet = cur.fetchone()
     if not sheet:
         return res_error("invalid_sheet", 404)
@@ -486,7 +486,7 @@ def delete_reserve(event_id, rank, num):
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT id, user_id FROM reservations
+            SELECT * FROM reservations
             WHERE
                 event_id = %s
                 AND sheet_id = %s
