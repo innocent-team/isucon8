@@ -95,6 +95,9 @@ def teardown(error):
     if hasattr(flask.g, "db"):
         flask.g.db.close()
 
+rank_price = {'S': 5000, 'A': 3000, 'B': 1000, 'C': 0}
+rank_count = {'S': 50, 'A': 150, 'B': 300, 'C': 500}
+rank_total = 1000
 
 def event_exist(event_id):
     cur = dbh().cursor()
@@ -147,22 +150,13 @@ def get_event(event_id, login_user_id=None, with_detail=True):
     event["remains"] = 0
     event["sheets"] = {}
 
-    cur.execute("""
-        select `rank`, count(*) as total, price 
-        from sheets
-        group by 1
-        order by `rank`, num
-    """)
-    total_rank = cur.fetchall()
-    for rank in total_rank:
+    for rank in rank_price:
+        rank_info = {
+            'total': rank_count[rank], 'remains': 0, 'detail': [], 'price': event['price'] + rank_price[rank]
+        }
         if with_detail:
-            event["sheets"][rank['rank']] = {
-                'total': rank['total'], 'remains': 0, 'detail': [], 'price': event['price'] + rank['price']
-            }
-        else:
-            event["sheets"][rank['rank']] = {
-                'total': rank['total'], 'remains': 0, 'price': event['price'] + rank['price']
-            }
+            rank_info['detail'] = []
+        event["sheets"][rank] = rank_info
 
     cur.execute("""
         SELECT s.*, r.user_id, r.reserved_at
@@ -211,13 +205,7 @@ def get_event_with_only_price(event_id, rank):
     event = cur.fetchone()
     if not event: return None
 
-    cur.execute("""
-        select price 
-        from sheets
-        where `rank` = %s
-        limit 1
-    """, [rank])
-    price = cur.fetchone()['price'] + event['price']
+    price = rank_price[rank] + event['price']
 
     event['public'] = True if event['public_fg'] else False
     event['closed'] = True if event['closed_fg'] else False
