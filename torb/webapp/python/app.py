@@ -638,7 +638,7 @@ def get_admin_event_sales(event_id):
     cur = dbh().cursor()
     for i in range(3):
         try:
-            cur.execute('select price from events where event_id = %s', [event_id])
+            cur.execute('select price from events where id = %s', [event_id])
             event_price = cur.fetchone()['price']
             reservations = cur.execute('''
                 SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num, s.price AS sheet_price, %s AS event_price
