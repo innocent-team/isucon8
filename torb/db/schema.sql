@@ -39,3 +39,5 @@ CREATE TABLE IF NOT EXISTS administrators (
     pass_hash   VARCHAR(128) NOT NULL,
     UNIQUE KEY login_name_uniq (login_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+create index if not exists reservations_user_id_canceled_at on reservations (user_id, canceled_at);
