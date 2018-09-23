@@ -383,7 +383,7 @@ def post_login():
 
     cur.execute('SELECT * FROM users WHERE login_name = %s', [login_name])
     user = cur.fetchone()
-    if not user or hashlib.sha256(password) != user['pass_hash']:
+    if not user or hashlib.sha256(password.encode('utf-8')) != user['pass_hash']:
         return res_error("authentication_failed", 401)
 
     flask.session['user_id'] = user["id"]
