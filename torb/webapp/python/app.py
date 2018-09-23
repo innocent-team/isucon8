@@ -205,6 +205,25 @@ def get_event(event_id, login_user_id=None, with_detail=True):
     del event['closed_fg']
     return event
 
+def get_event_with_only_price(event_id, rank):
+    cur = dbh().cursor()
+    cur.execute("SELECT * FROM events WHERE id = %s", [event_id])
+    event = cur.fetchone()
+    if not event: return None
+
+    cur.execute("""
+        select price 
+        from sheets
+        where `rank` = %s
+        limit 1
+    """, [rank])
+    price = cur.fetchone()['price'] + event['price']
+
+    event['public'] = True if event['public_fg'] else False
+    event['closed'] = True if event['closed_fg'] else False
+    del event['public_fg']
+    del event['closed_fg']
+    return event, price
 
 def sanitize_event(event):
     sanitized = copy.copy(event)
@@ -320,11 +339,7 @@ def get_users(user_id):
         [user['id']])
     recent_reservations = []
     for row in cur.fetchall():
-        event = get_event(row['event_id'])
-        price = event['sheets'][row['sheet_rank']]['price']
-        del event['sheets']
-        del event['total']
-        del event['remains']
+        event, price = get_event_with_only_price(row['event_id'], row['sheet_rank'])
 
         if row['canceled_at']:
             canceled_at = int(row['canceled_at'].replace(tzinfo=timezone.utc).timestamp())
