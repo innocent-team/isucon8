@@ -638,16 +638,17 @@ def get_admin_event_sales(event_id):
     cur = dbh().cursor()
     for i in range(3):
         try:
+            cur.execute('select price from events where event_id = %s', [event_id])
+            event_price = cur.fetchone()['price']
             reservations = cur.execute('''
-                SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num, s.price AS sheet_price, e.price AS event_price
+                SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num, s.price AS sheet_price, %s AS event_price
                 FROM reservations r
                 INNER JOIN sheets s ON s.id = r.sheet_id
-                INNER JOIN events e ON e.id = r.event_id
                 WHERE
                     r.event_id = %s
                 ORDER BY reserved_at ASC
                 FOR UPDATE''',
-                [event_id])
+                [event_price, event_id])
             reservations = cur.fetchall()
             break
         except MySQLdb.Error as e:
