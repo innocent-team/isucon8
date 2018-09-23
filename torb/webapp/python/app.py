@@ -305,7 +305,7 @@ def get_users(user_id):
                e.public_fg AS public_fg, e.closed_fg AS closed_fg
         FROM reservations r
         INNER JOIN sheets s ON s.id = r.sheet_id
-	INNER JOIN events e ON e.id = r.event_id
+        INNER JOIN events e ON e.id = r.event_id
         WHERE
             r.user_id = %s
         ORDER BY IFNULL(r.canceled_at, r.reserved_at)
@@ -314,7 +314,7 @@ def get_users(user_id):
         [user['id']])
     recent_reservations = []
     for row in cur.fetchall():
-	event = {
+        event = {
             'id': int(row['event_id']),
             'title': row['title'],
             'price': int(row['price']),
