@@ -229,8 +229,6 @@ def validate_rank(rank):
 
 
 def render_report_csv(reports):
-    reports = sorted(reports, key=lambda x: x['sold_at'])
-
     keys = ["reservation_id", "event_id", "rank", "num", "price", "user_id", "sold_at", "canceled_at"]
 
     body = []
