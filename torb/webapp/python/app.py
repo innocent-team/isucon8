@@ -10,6 +10,7 @@ import subprocess
 from io import StringIO
 import csv
 from datetime import datetime, timezone
+import hashlib
 
 
 base_path = pathlib.Path(__file__).resolve().parent.parent
@@ -382,9 +383,7 @@ def post_login():
 
     cur.execute('SELECT * FROM users WHERE login_name = %s', [login_name])
     user = cur.fetchone()
-    cur.execute('SELECT SHA2(%s, 256) AS pass_hash', [password])
-    pass_hash = cur.fetchone()
-    if not user or pass_hash['pass_hash'] != user['pass_hash']:
+    if not user or hashlib.sha256(password) != user['pass_hash']:
         return res_error("authentication_failed", 401)
 
     flask.session['user_id'] = user["id"]
