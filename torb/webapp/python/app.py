@@ -144,9 +144,7 @@ def get_event(event_id, login_user_id=None, with_detail=True):
     event = cur.fetchone()
     if not event: return None
 
-    cur.execute("select count(*) as total from sheets")
-    total = cur.fetchone()['total']
-    event["total"] = total
+    event["total"] = rank_total
     event["remains"] = 0
     event["sheets"] = {}
 
