@@ -197,20 +197,6 @@ def get_event(event_id, login_user_id=None, with_detail=True):
     del event['closed_fg']
     return event
 
-def get_event_with_only_price(event_id, rank):
-    cur = dbh().cursor()
-    cur.execute("SELECT * FROM events WHERE id = %s", [event_id])
-    event = cur.fetchone()
-    if not event: return None
-
-    price = rank_price[rank] + event['price']
-
-    event['public'] = True if event['public_fg'] else False
-    event['closed'] = True if event['closed_fg'] else False
-    del event['public_fg']
-    del event['closed_fg']
-    return event, price
-
 def sanitize_event(event):
     sanitized = copy.copy(event)
     del sanitized['price']
@@ -313,10 +299,12 @@ def get_users(user_id):
         return ('', 403)
 
     cur.execute("""
-        SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num
+        SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num,
+               e.title AS title, e.price AS price,
+               e.public_fg AS public_fg, e.closed_fg AS closed_fg
         FROM reservations r
-        INNER JOIN sheets s
-        ON s.id = r.sheet_id
+        INNER JOIN sheets s ON s.id = r.sheet_id
+	INNER JOIN events e ON e.id = r.event_id
         WHERE
             r.user_id = %s
         ORDER BY IFNULL(r.canceled_at, r.reserved_at)
@@ -325,13 +313,21 @@ def get_users(user_id):
         [user['id']])
     recent_reservations = []
     for row in cur.fetchall():
-        event, price = get_event_with_only_price(row['event_id'], row['sheet_rank'])
+	event = {
+            'id': int(row['event_id']),
+            'title': row['title'],
+            'price': int(row['price']),
+            'public': True if row['public_fg'] else False,
+            'closed': True if row['closed_fg'] else False,
+        }
 
         if row['canceled_at']:
             canceled_at = int(row['canceled_at'].replace(tzinfo=timezone.utc).timestamp())
         else:
             canceled_at = None
 
+        price = rank_price[row['sheet_rank']] + event['price']
+ 
         recent_reservations.append({
             "id": int(row['id']),
             "event": event,
