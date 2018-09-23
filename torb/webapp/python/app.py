@@ -711,4 +711,6 @@ def get_admin_sales():
 
 
 if __name__ == "__main__":
-    app.run(port=8080, debug=True, threaded=True)
+    import bjoern
+    bjoern.run(app, "0.0.0.0", 8080)
+    # app.run(port=8080, debug=True, threaded=True)
