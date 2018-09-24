@@ -8,6 +8,7 @@ import copy
 import json
 import random
 import subprocess
+import itertools
 from io import StringIO
 import csv
 from datetime import datetime, timezone
@@ -262,10 +263,7 @@ def validate_rank(rank):
 def render_report_csv(reports):
     keys = ["reservation_id", "event_id", "rank", "num", "price", "user_id", "sold_at", "canceled_at"]
 
-    body = []
-    body.append(keys)
-    for report in reports:
-        body.append([report[key] for key in keys])
+    body = itertools.chain(keys, ((report[key] for key in keys) for report in reports))
 
     f = StringIO()
     writer = csv.writer(f)
