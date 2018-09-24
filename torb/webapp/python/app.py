@@ -724,7 +724,6 @@ def get_admin_sales():
         INNER JOIN events e
         ON e.id = r.event_id
         ORDER BY reserved_at ASC
-        FOR UPDATE
     ''')
     reservations = list(cur.fetchall())
 
