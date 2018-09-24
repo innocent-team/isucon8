@@ -735,7 +735,7 @@ def get_admin_sales():
         ORDER BY reserved_at ASC
         FOR UPDATE
     ''')
-    reservations = cur.fetchall()
+    reservations = list(cur.fetchall())
 
     def make_reports():
         for reservation in reservations:
