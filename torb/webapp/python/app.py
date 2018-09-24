@@ -794,7 +794,7 @@ def generate_admin_sales():
                 id, canceled_at
             FROM reservations
             WHERE canceled_at >= %s
-            ORDER BY reserved_at ASC
+            ORDER BY canceled_at ASC
             FOR UPDATE
         ''', [_last_updated_at.strftime("%F %T.%f")])
         for row in cur.fetchall():
@@ -805,7 +805,7 @@ def generate_admin_sales():
                 print("row['id'] - 1 = {}".format(row['id'] - 1), file=sys.stderr)
                 raise e
 
-        _last_updated_at = datetime.utcnow()
+        _last_updated_at = row['canceled_at']
 
 
 
