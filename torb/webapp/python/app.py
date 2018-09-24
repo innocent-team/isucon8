@@ -263,7 +263,7 @@ def validate_rank(rank):
 def render_report_csv(reports):
     keys = ["reservation_id", "event_id", "rank", "num", "price", "user_id", "sold_at", "canceled_at"]
 
-    body = itertools.chain([keys], ((report[key] for key in keys) for report in reports))
+    body = itertools.chain([keys], reports)
 
     f = StringIO()
     writer = csv.writer(f)
@@ -707,16 +707,16 @@ def get_admin_event_sales(event_id):
         else: canceled_at = ''
         rank = calculate_rank(reservation['sheet_id'])
         sheet_idx = reservation['sheet_id'] - 1
-        reports.append({
-            "reservation_id": reservation['id'],
-            "event_id":       event_id,
-            "rank":           rank,
-            "num":            sheets()[sheet_idx]['num'],
-            "user_id":        reservation['user_id'],
-            "sold_at":        reservation['reserved_at'].isoformat()+"Z",
-            "canceled_at":    canceled_at,
-            "price":          reservation['event_price'] + sheets()[sheet_idx]['price'],
-        })
+        reports.append([
+            reservation['id'],
+            event_id,
+            rank,
+            sheets()[sheet_idx]['num'],
+            reservation['event_price'] + sheets()[sheet_idx]['price'],
+            reservation['user_id'],
+            reservation['reserved_at'].isoformat()+"Z",
+            canceled_at,
+        ])
 
     return render_report_csv(reports)
 
@@ -744,16 +744,16 @@ def get_admin_sales():
             else: canceled_at = ''
             rank = calculate_rank(reservation['sheet_id'])
             sheet_idx = reservation['sheet_id'] - 1
-            yield {
-                "reservation_id": reservation['id'],
-                "event_id":       reservation['event_id'],
-                "rank":           rank,
-                "num":            sheets()[sheet_idx]['num'],
-                "user_id":        reservation['user_id'],
-                "sold_at":        reservation['reserved_at'].isoformat()+"Z",
-                "canceled_at":    canceled_at,
-                "price":          reservation['event_price'] + sheets()[sheet_idx]['price'],
-            }
+            yield [
+                reservation['id'],
+                reservation['event_id'],
+                rank,
+                sheets()[sheet_idx]['num'],
+                reservation['event_price'] + sheets()[sheet_idx]['price'],
+                reservation['user_id'],
+                reservation['reserved_at'].isoformat()+"Z",
+                canceled_at,
+            ]
     return render_report_csv(make_reports())
 
 
