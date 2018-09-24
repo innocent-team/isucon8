@@ -777,7 +777,7 @@ def generate_admin_sales():
             WHERE id > %s
             ORDER BY reserved_at ASC
             FOR UPDATE
-        ''', [_reservations[-1][0]])
+        ''', [_reservations[-1][0] if _reservations else 0])
 
         for reservation in cur.fetchall():
             _reservations.append(make_report(reservation))
