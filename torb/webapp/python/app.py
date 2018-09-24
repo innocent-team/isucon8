@@ -100,6 +100,39 @@ def teardown(error):
 rank_price = {'S': 5000, 'A': 3000, 'B': 1000, 'C': 0}
 rank_count = {'S': 50, 'A': 150, 'B': 300, 'C': 500}
 rank_total = 1000
+_sheets = None
+
+def sheets():
+    global _sheets
+    if _sheets:
+        return _sheets
+
+    cur = dbh().cursor()
+    cur.execute("SELECT * FROM sheets ORDER BY `rank`, num")
+    _sheets = cur.fetchall()
+    return _sheets
+
+
+def calculate_rank(sheet_id):
+    """
+    case
+      when sheet_id between 1 and 50 then 'S'
+      when sheet_id between 51 and 200 then 'A'
+      when sheet_id between 201 and 500 then 'B'
+      else 'C'
+    end
+    """
+    if 1 <= sheet_id <= 50:
+        return 'S'
+    elif 51 <= sheet_id <= 200:
+        return 'A'
+    elif 201 <= sheet_id <= 500:
+        return 'B'
+    elif 501 <= sheet_id <= 1000:
+        return 'C'
+    else:
+        raise Exception("Invalid sheet_id: {}".format(sheet_id))
+
 
 def event_exist(event_id):
     cur = dbh().cursor()
@@ -152,64 +185,43 @@ def get_event(event_id, login_user_id=None, with_detail=True):
 
     for rank in rank_price:
         rank_info = {
-            'total': rank_count[rank], 'remains': 0, 'detail': [], 'price': event['price'] + rank_price[rank]
+            'total': rank_count[rank], 'remains': rank_count[rank], 'detail': [], 'price': event['price'] + rank_price[rank]
         }
         if with_detail:
             rank_info['detail'] = []
         event["sheets"][rank] = rank_info
 
     cur.execute("""
-    select `rank`, count(reserved_at) as reserved
-    from (
-      select s.`rank`, r.reserved_at
-      from sheets s
-      left join reservations r
-      on s.id = r.sheet_id
-      and r.canceled_at is null
-      and r.event_id = %s
-      group by s.id
-      having ifnull(r.reserved_at = min(r.reserved_at), true)
-    ) t
+    select r.sheet_id, r.user_id, r.reserved_at
+    from reservations r
+    where
+        r.canceled_at is null
+        and r.event_id = %s
     group by 1
+    having r.reserved_at = min(r.reserved_at)
+    order by 1
     """, [event_id])
-    reserved_per_rank = cur.fetchall()
+    reserved_sheets = cur.fetchall()
 
-    for rank in reserved_per_rank:
-        remains = rank_count[rank['rank']] - rank['reserved']
-        event['sheets'][rank['rank']]['remains'] = remains
-        event['remains'] += remains
+    event['remains'] = rank_total
 
-    cur.execute("""
-        SELECT s.*, r.user_id, r.reserved_at
-        FROM sheets s
-        LEFT JOIN reservations r
-        ON r.event_id = %s
-        AND s.id = r.sheet_id
-        AND r.canceled_at IS NULL
-        GROUP BY s.id
-        HAVING IFNULL(r.reserved_at = MIN(r.reserved_at), TRUE)
-        ORDER BY s.`rank`, s.num
-    """, [event['id']])
-    sheets = cur.fetchall()
-    for sheet in sheets:
-        if sheet['user_id']:
-            if with_detail:
-                if login_user_id and sheet['user_id'] == login_user_id:
-                    sheet['mine'] = True
-                sheet['reserved'] = True
-                sheet['reserved_at'] = int(sheet['reserved_at'].replace(tzinfo=timezone.utc).timestamp())
-
-        if with_detail:
+    if with_detail:
+        for sheet in sheets():
             event['sheets'][sheet['rank']]['detail'].append(sheet)
 
-            del sheet['user_id']
+    for reserved_sheet in reserved_sheets:
+        sheet_id = reserved_sheet['sheet_id']
+        sheet_index = sheet_id - 1
+        sheet_num_index = sheets()[sheet_index]['num'] - 1
+        rank = calculate_rank(sheet_id)
+        event['sheets'][rank]['remains'] -= 1
+        event['remains'] -= 1
 
-            if sheet['reserved_at'] is None:
-                del sheet['reserved_at']
-
-            del sheet['id']
-            del sheet['price']
-            del sheet['rank']
+        if with_detail:
+            if login_user_id and sheet['user_id'] == login_user_id:
+                event['sheets'][rank]['detail'][sheet_num]['mine'] = True
+            sheet['sheets'][rank]['detail'][sheet_num_index]['reserved'] = True
+            sheet['sheets'][rank]['detail'][sheet_num_index]['reserved_at'] = int(reserved_sheet['reserved_at'].replace(tzinfo=timezone.utc).timestamp())
 
     event['public'] = True if event['public_fg'] else False
     event['closed'] = True if event['closed_fg'] else False
