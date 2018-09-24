@@ -737,24 +737,24 @@ def get_admin_sales():
     ''')
     reservations = cur.fetchall()
 
-    reports = []
-    for reservation in reservations:
-        if reservation['canceled_at']:
-            canceled_at = reservation['canceled_at'].isoformat()+"Z"
-        else: canceled_at = ''
-        rank = calculate_rank(reservation['sheet_id'])
-        sheet_idx = reservation['sheet_id'] - 1
-        reports.append({
-            "reservation_id": reservation['id'],
-            "event_id":       reservation['event_id'],
-            "rank":           rank,
-            "num":            sheets()[sheet_idx]['num'],
-            "user_id":        reservation['user_id'],
-            "sold_at":        reservation['reserved_at'].isoformat()+"Z",
-            "canceled_at":    canceled_at,
-            "price":          reservation['event_price'] + sheets()[sheet_idx]['price'],
-        })
-    return render_report_csv(reports)
+    def make_reports():
+        for reservation in reservations:
+            if reservation['canceled_at']:
+                canceled_at = reservation['canceled_at'].isoformat()+"Z"
+            else: canceled_at = ''
+            rank = calculate_rank(reservation['sheet_id'])
+            sheet_idx = reservation['sheet_id'] - 1
+            yield {
+                "reservation_id": reservation['id'],
+                "event_id":       reservation['event_id'],
+                "rank":           rank,
+                "num":            sheets()[sheet_idx]['num'],
+                "user_id":        reservation['user_id'],
+                "sold_at":        reservation['reserved_at'].isoformat()+"Z",
+                "canceled_at":    canceled_at,
+                "price":          reservation['event_price'] + sheets()[sheet_idx]['price'],
+            }
+    return render_report_csv(make_reports())
 
 
 if __name__ == "__main__":
