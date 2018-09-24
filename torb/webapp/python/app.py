@@ -295,20 +295,21 @@ def post_users():
     conn.autocommit(False)
     cur = conn.cursor()
     try:
-        cur.execute("SELECT * FROM users WHERE login_name = %s", [login_name])
-        duplicated = cur.fetchone()
-        if duplicated:
-            conn.rollback()
-            return res_error('duplicated', 409)
         cur.execute(
             "INSERT INTO users (login_name, pass_hash, nickname) VALUES (%s, SHA2(%s, 256), %s)",
             [login_name, password, nickname])
         user_id = cur.lastrowid
         conn.commit()
+    except MySQLdb.IntegrityError as e:
+        conn.rollback()
+        print(e)
+        return res_error('duplicated', 409)
     except MySQLdb.Error as e:
         conn.rollback()
         print(e)
         return res_error()
+    finally:
+        conn.autocommit(True)
     return (jsonify({"id": user_id, "nickname": nickname}), 201)
 
 
