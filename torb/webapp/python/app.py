@@ -336,7 +336,7 @@ def get_users(user_id):
     cur = dbh().cursor()
     cur.execute('SELECT id, nickname FROM users WHERE id = %s', [user_id])
     user = cur.fetchone()
-    if not ('user' in flask.session and user['id'] == flask.session['user_id']):
+    if user['id'] != flask.session['user_id']:
         return ('', 403)
 
     cur.execute("""
