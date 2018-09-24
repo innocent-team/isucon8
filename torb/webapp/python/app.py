@@ -287,7 +287,8 @@ def get_index():
 @app.route('/initialize')
 def get_initialize():
     generate_admin_sales()
-    subprocess.call(["../../db/init.sh"])
+    if subprocess.call(["curl", "http://isucon2:8080/initialize"]) != 0:
+        raise Exception("initialize failed!")
     return ('', 204)
 
 
