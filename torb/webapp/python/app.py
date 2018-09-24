@@ -774,8 +774,8 @@ def generate_admin_sales():
             FROM reservations r
             INNER JOIN events e
             ON e.id = r.event_id
-            WHERE id > %s
-            ORDER BY reserved_at ASC
+            WHERE r.id > %s
+            ORDER BY r.reserved_at ASC
             FOR UPDATE
         ''', [_reservations[-1][0] if _reservations else 0])
 
