@@ -158,15 +158,12 @@ def get_events(only_public=False):
     cur = conn.cursor()
     try:
         if only_public:
-            cur.execute("SELECT * FROM events WHERE public_fg = 1 ORDER BY id ASC")
+            cur.execute("SELECT id FROM events WHERE public_fg = 1 ORDER BY id ASC")
         else:
-            cur.execute("SELECT * FROM events ORDER BY id ASC")
+            cur.execute("SELECT id FROM events ORDER BY id ASC")
         rows = cur.fetchall()
         event_ids = [row['id'] for row in rows]
-        events = []
-        for event_id in event_ids:
-            event = get_event(event_id, with_detail=False)
-            events.append(event)
+        events = [get_event(event_id, with_detail=False) for event_id in event_ids]
         conn.commit()
     except MySQLdb.Error as e:
         conn.rollback()
@@ -278,9 +275,7 @@ def render_report_csv(reports):
 @app.route('/')
 def get_index():
     user = get_login_user()
-    events = []
-    for event in get_events(True):
-        events.append(sanitize_event(event))
+    events = [sanitize_event(event) for event in get_events(True)]
     return flask.render_template('index.html', user=user, events=events, base_url=make_base_url(flask.request))
 
 
@@ -394,10 +389,7 @@ def get_users(user_id):
         """,
         [user['id']])
     rows = cur.fetchall()
-    recent_events = []
-    for row in rows:
-        event = get_event(row['event_id'], with_detail=False)
-        recent_events.append(event)
+    recent_events = [get_event(row['event_id'], with_detail=False) for row in rows]
     user['recent_events'] = recent_events
 
     return jsonify(user)
@@ -430,9 +422,7 @@ def post_logout():
 
 @app.route('/api/events')
 def get_events_api():
-    events = []
-    for event in get_events(True):
-        events.append(sanitize_event(event))
+    events = [sanitize_event(event) for event in get_events(True)]
     return jsonify(events)
 
 
