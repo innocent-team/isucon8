@@ -220,8 +220,8 @@ def get_event(event_id, login_user_id=None, with_detail=True):
         if with_detail:
             if login_user_id and sheet['user_id'] == login_user_id:
                 event['sheets'][rank]['detail'][sheet_num]['mine'] = True
-            sheet['sheets'][rank]['detail'][sheet_num_index]['reserved'] = True
-            sheet['sheets'][rank]['detail'][sheet_num_index]['reserved_at'] = int(reserved_sheet['reserved_at'].replace(tzinfo=timezone.utc).timestamp())
+            event['sheets'][rank]['detail'][sheet_num_index]['reserved'] = True
+            event['sheets'][rank]['detail'][sheet_num_index]['reserved_at'] = int(reserved_sheet['reserved_at'].replace(tzinfo=timezone.utc).timestamp())
 
     event['public'] = True if event['public_fg'] else False
     event['closed'] = True if event['closed_fg'] else False
