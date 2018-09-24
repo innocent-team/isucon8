@@ -749,11 +749,11 @@ def generate_admin_sales():
     global _reservations
     global _last_updated_at
 
+    cur = dbh().cursor()
     if _last_updated_at is None:
         # initialize
         _last_updated_at = datetime.utcnow()
 
-        cur = dbh().cursor()
         cur.execute('''
             SELECT
                 r.*,
