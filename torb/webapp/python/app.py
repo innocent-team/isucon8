@@ -207,7 +207,7 @@ def get_event(event_id, login_user_id=None, with_detail=True):
 
     if with_detail:
         for sheet in sheets():
-            event['sheets'][sheet['rank']]['detail'].append(sheet)
+            event['sheets'][sheet['rank']]['detail'].append(copy.copy(sheet))
 
     for reserved_sheet in reserved_sheets:
         sheet_id = reserved_sheet['sheet_id']
