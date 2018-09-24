@@ -108,7 +108,7 @@ def sheets():
         return _sheets
 
     cur = dbh().cursor()
-    cur.execute("SELECT * FROM sheets ORDER BY `rank`, num")
+    cur.execute("SELECT * FROM sheets ORDER BY id")
     _sheets = cur.fetchall()
     return _sheets
 
