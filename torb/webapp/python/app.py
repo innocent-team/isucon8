@@ -60,7 +60,7 @@ def res_error(error="unknown", status=500):
 def login_required(f):
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
-        if not get_login_user():
+        if 'user_id' not in flask.session:
             return res_error('login_required', 401)
         return f(*args, **kwargs)
     return wrapper
@@ -336,7 +336,7 @@ def get_users(user_id):
     cur = dbh().cursor()
     cur.execute('SELECT id, nickname FROM users WHERE id = %s', [user_id])
     user = cur.fetchone()
-    if user['id'] != get_login_user()['id']:
+    if not ('user' in flask.session and user['id'] == flask.session['user_id']):
         return ('', 403)
 
     cur.execute("""
@@ -536,7 +536,7 @@ def calculate_sheet_id(rank, num):
 @app.route('/api/events/<int:event_id>/sheets/<rank>/<int:num>/reservation', methods=['DELETE'])
 @login_required
 def delete_reserve(event_id, rank, num):
-    user = get_login_user()
+    user_id = flask.session['user_id']
 
     if not event_exist_and_public(event_id):
         return res_error("invalid_event", 404)
@@ -569,7 +569,7 @@ def delete_reserve(event_id, rank, num):
             if not reservation:
                 conn.rollback()
                 return res_error("not_reserved", 400)
-            if reservation['user_id'] != user['id']:
+            if reservation['user_id'] != user_id:
                 conn.rollback()
                 return res_error("not_permitted", 403)
 
