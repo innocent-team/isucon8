@@ -7,7 +7,6 @@ import pathlib
 import copy
 import json
 import random
-import time
 import subprocess
 import itertools
 from io import StringIO
@@ -464,8 +463,6 @@ def post_reserve(event_id):
 
     sheet = None
     reservation_id = 0
-
-    time.sleep(0.5)
 
     conn =  dbh()
     cur = conn.cursor()
