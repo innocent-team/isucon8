@@ -3,6 +3,7 @@ import MySQLdb.cursors
 import flask
 import functools
 import os
+import sys
 import pathlib
 import copy
 import json
@@ -798,8 +799,8 @@ def generate_admin_sales():
             try:
                 _reservations[row['id'] - 1][-1] = row['canceled_at']
             except Exception as e:
-                print("len(_reservations) = {}".format(len(_reservations)))
-                print("row['id'] - 1 = {}".format(row['id'] - 1))
+                print("len(_reservations) = {}".format(len(_reservations)), file=sys.stderr)
+                print("row['id'] - 1 = {}".format(row['id'] - 1), file=sys.stderr)
                 raise e
 
         _last_updated_at = datetime.utcnow()
