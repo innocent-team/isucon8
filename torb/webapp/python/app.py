@@ -12,8 +12,9 @@ import subprocess
 import itertools
 from io import StringIO
 import csv
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import hashlib
+import redis
 
 
 base_path = pathlib.Path(__file__).resolve().parent.parent
@@ -93,6 +94,12 @@ def dbh():
     cur.execute("SET SESSION sql_mode='STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'")
     return flask.g.db
 
+redis_pool = None
+def redish():
+    global redis_pool
+    if redis_pool is None:
+        redis_pool = redis.ConnectionPool(host='localhost', port=6379, db=0)
+    return redis.StrictRedis(connection_pool=redis_pool)
 
 @app.teardown_appcontext
 def teardown(error):
@@ -299,9 +306,13 @@ def get_index():
 
 @app.route('/initialize')
 def get_initialize():
-    generate_admin_sales()
+    print("Initialize Start", file=sys.stderr)
     if subprocess.call(["curl", "http://isucon2:8080/initialize"]) != 0:
         raise Exception("initialize failed!")
+    if subprocess.call(["bash", "./restore_redis.sh"]) != 0:
+        raise Exception("initialize failed!")
+    generate_admin_sales()
+    print("Initialize End", file=sys.stderr)
     return ('', 204)
 
 
@@ -741,87 +752,93 @@ def get_admin_event_sales(event_id):
     return render_report_csv(reports)
 
 
-_reservations = []
-_last_updated_at = None
+resv_hash = "resv_hash"
+resv_last_up = "resv_last_up"
+resv_last_id = "resv_last_id"
+
+def cancel_str(cancel):
+    if cancel:
+        return cancel.isoformat()+"Z"
+    else:
+        return ""
 
 def make_report(reservation):
-    if reservation['canceled_at']:
-        canceled_at = reservation['canceled_at'].isoformat()+"Z"
-    else: canceled_at = ''
+    canceled_at = cancel_str(reservation['canceled_at'])
     rank = calculate_rank(reservation['sheet_id'])
     sheet_idx = reservation['sheet_id'] - 1
-    return [
+    res = [
         reservation['id'],
         reservation['event_id'],
         rank,
         sheets()[sheet_idx]['num'],
         reservation['event_price'] + sheets()[sheet_idx]['price'],
-        reservation['user_id'],
+        rese['user_id'],
         reservation['reserved_at'].isoformat()+"Z",
         canceled_at,
     ]
+    return ",".join(str(x) for x in res)
 
+_init_sale = None
 def generate_admin_sales():
-    global _reservations
-    global _last_updated_at
+    global _init_sale
 
     cur = dbh().cursor()
-    if _last_updated_at is None:
-        # initialize
-        _last_updated_at = datetime.utcnow()
+    r = redish()
+    if _init_sale is None:
+        _init_sale = True	
+        #initialize!!!
+        #r.delete(resv_hash)
+        #r.zadd(resv_hash, 0, "non-value")
+        #last_updated_at = datetime.utcnow() - timedelta(days=8000)
+        #r.set(resv_last_up, last_updated_at.strftime("%F %T.%f"))
+        #r.set(resv_last_id, "0")
+    # fetch canceled reservations
+    last_updated_at = r.get(resv_last_up)
+    last_id = r.get(resv_last_id)
+    cur.execute('''
+        SELECT
+            id, canceled_at
+        FROM reservations
+        WHERE canceled_at >= %s
+        AND id <= %s
+        ORDER BY canceled_at ASC
+        FOR UPDATE
+    ''', [last_updated_at, last_id])
+    canceled = cur.fetchall()
 
-        cur.execute('''
-            SELECT
-                r.*,
-                e.id AS event_id, e.price AS event_price
-            FROM reservations r
-            INNER JOIN events e
-            ON e.id = r.event_id
-            ORDER BY reserved_at ASC
-            FOR UPDATE
-        ''')
+    # add new reservations
+    cur.execute('''
+        SELECT
+            r.*,
+            e.id AS event_id, e.price AS event_price
+        FROM reservations r
+        INNER JOIN events e
+        ON e.id = r.event_id
+        WHERE r.id > %s
+        ORDER BY r.reserved_at ASC
+        FOR UPDATE
+    ''', [last_id])
 
-        for reservation in cur.fetchall():
-            _reservations.append(make_report(reservation))
-    else:
-        # fetch canceled reservations
-        cur.execute('''
-            SELECT
-                id, canceled_at
-            FROM reservations
-            WHERE canceled_at >= %s
-            ORDER BY canceled_at ASC
-            FOR UPDATE
-        ''', [_last_updated_at.strftime("%F %T.%f")])
-        canceled = cur.fetchall()
+    reservation = None
+    for i, reservation in enumerate(cur.fetchall()):
+        r.zadd(resv_hash, reservation['id'], make_report(reservation))
+    
+    if reservation:
+        r.set(resv_last_id, reservation['id'])
 
-        # add new reservations
-        cur.execute('''
-            SELECT
-                r.*,
-                e.id AS event_id, e.price AS event_price
-            FROM reservations r
-            INNER JOIN events e
-            ON e.id = r.event_id
-            WHERE r.id > %s
-            ORDER BY r.reserved_at ASC
-            FOR UPDATE
-        ''', [_reservations[-1][0] if _reservations else 0])
-
-        for reservation in cur.fetchall():
-            _reservations.append(make_report(reservation))
-
-        # update canceled reservations
-        for row in canceled:
-            try:
-                _reservations[row['id'] - 1][-1] = row['canceled_at']
-            except Exception as e:
-                print("len(_reservations) = {}".format(len(_reservations)), file=sys.stderr)
-                print("row['id'] - 1 = {}".format(row['id'] - 1), file=sys.stderr)
-                raise e
-
-        _last_updated_at = row['canceled_at']
-
+    # update canceled reservations
+    row = None
+    for row in canceled:
+        try:
+            l = r.zrange(resv_hash, row['id'], row['id'])[0]
+            r.zrem(resv_hash, l)
+            l = l.decode("utf-8") + cancel_str(row['canceled_at'])
+            r.zadd(resv_hash, row['id'], l)
+        except Exception as e:
+            print("row['id'] - 1 = {}".format(row['id'] - 1), file=sys.stderr)
+            raise e
+    if row:
+        r.set(resv_last_up, row['canceled_at'].strftime("%F %T.%f"))
 
 
 @app.route('/admin/api/reports/sales')
@@ -830,8 +847,21 @@ def get_admin_sales():
     global _reservations
     generate_admin_sales()
 
-    return render_report_csv(_reservations)
+    keys = ["reservation_id", "event_id", "rank", "num", "price", "user_id", "sold_at", "canceled_at"]
+    f = StringIO()
+    f.write(",".join(keys))
+    f.write("\n")
 
+    r = redish()
+    for resv in r.zrange(resv_hash, "1", "-1"):
+        f.write(resv.decode('utf-8'))
+        f.write("\n")
+
+    res = flask.make_response()
+    res.data = f.getvalue()
+    res.headers['Content-Type'] = 'text/csv'
+    res.headers['Content-Disposition'] = 'attachment; filename=report.csv'
+    return res
 
 if __name__ == "__main__":
     import bjoern
