@@ -468,6 +468,7 @@ def post_reserve(event_id):
 
     conn =  dbh()
     cur = conn.cursor()
+    conn.autocommit(False)
     cur.execute("""
         SELECT id, num FROM sheets
         WHERE
@@ -486,9 +487,9 @@ def post_reserve(event_id):
     try:
         sheet = random.choice(sheets)
     except IndexError:
+        conn.autocommit(True)
         return res_error("sold_out", 409)
     try:
-        conn.autocommit(False)
         cur = conn.cursor()
         cur.execute(
             "INSERT INTO reservations (event_id, sheet_id, user_id, reserved_at) VALUES (%s, %s, %s, %s)",
@@ -498,6 +499,8 @@ def post_reserve(event_id):
     except MySQLdb.Error as e:
         conn.rollback()
         print(e)
+    finally:
+        conn.autocommit(True)
 
     content = jsonify({
         "id": reservation_id,
