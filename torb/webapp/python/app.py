@@ -257,6 +257,23 @@ def validate_rank(rank):
     return rank in set('SABC')
 
 
+def validate_sheet(rank, num):
+    if not validate_rank(rank)
+        return False
+
+    if rank == 'S' and 1 <= num <= 50:
+        return True
+    if rank == 'A' and 1 <= num <= 150:
+        return True
+    if rank == 'B' and 1 <= num <= 200:
+        return True
+    if rank == 'C' and 1 <= num <= 300:
+        return True
+
+    return False
+
+
+
 def render_report_csv(reports):
     keys = ["reservation_id", "event_id", "rank", "num", "price", "user_id", "sold_at", "canceled_at"]
 
@@ -515,11 +532,7 @@ def delete_reserve(event_id, rank, num):
         return res_error("invalid_event", 404)
     if not validate_rank(rank):
         return res_error("invalid_rank", 404)
-
-    cur = dbh().cursor()
-    cur.execute('SELECT id FROM sheets WHERE `rank` = %s AND num = %s', [rank, num])
-    sheet = cur.fetchone()
-    if not sheet:
+    if not validate_sheet(rank, num):
         return res_error("invalid_sheet", 404)
 
     for i in range(3):
