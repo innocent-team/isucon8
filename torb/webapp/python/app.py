@@ -329,11 +329,10 @@ def get_users(user_id):
         return ('', 403)
 
     cur.execute("""
-        SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num,
+        SELECT r.*,
                e.title AS title, e.price AS price,
                e.public_fg AS public_fg, e.closed_fg AS closed_fg
         FROM reservations r
-        INNER JOIN sheets s ON s.id = r.sheet_id
         INNER JOIN events e ON e.id = r.event_id
         WHERE
             r.user_id = %s
@@ -343,6 +342,9 @@ def get_users(user_id):
         [user['id']])
     recent_reservations = []
     for row in cur.fetchall():
+        rank = calculate_rank(row['sheet_id'])
+        sheet_idx = row['sheet_id'] - 1
+        sheet_num = sheets()[sheet_idx]['num']
         event = {
             'id': int(row['event_id']),
             'title': row['title'],
@@ -356,13 +358,13 @@ def get_users(user_id):
         else:
             canceled_at = None
 
-        price = rank_price[row['sheet_rank']] + event['price']
+        price = rank_price[rank] + event['price']
  
         recent_reservations.append({
             "id": int(row['id']),
             "event": event,
-            "sheet_rank": row['sheet_rank'],
-            "sheet_num": int(row['sheet_num']),
+            "sheet_rank": rank,
+            "sheet_num": int(sheet_num),
             "price": int(price),
             "reserved_at": int(row['reserved_at'].replace(tzinfo=timezone.utc).timestamp()),
             "canceled_at": canceled_at,
