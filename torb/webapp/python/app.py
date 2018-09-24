@@ -692,12 +692,12 @@ def get_admin_event_sales(event_id):
         reports.append({
             "reservation_id": reservation['id'],
             "event_id":       event_id,
-            "rank":           reservation['sheet_rank'],
-            "num":            reservation['sheet_num'],
+            "rank":           rank,
+            "num":            sheets()[sheet_idx]['num'],
             "user_id":        reservation['user_id'],
             "sold_at":        reservation['reserved_at'].isoformat()+"Z",
             "canceled_at":    canceled_at,
-            "price":          reservation['event_price'] + reservation['sheet_price'],
+            "price":          reservation['event_price'] + sheets()[sheet_idx]['price'],
         })
 
     return render_report_csv(reports)
