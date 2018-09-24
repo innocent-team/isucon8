@@ -483,8 +483,9 @@ def post_reserve(event_id):
         """,
         [event_id, rank])
     sheets = cur.fetchall()
-    sheet = random.choice(sheets)
-    if not sheet:
+    try:
+        sheet = random.choice(sheets)
+    except IndexError:
         return res_error("sold_out", 409)
     try:
         conn.autocommit(False)
