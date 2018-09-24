@@ -286,6 +286,7 @@ def get_index():
 
 @app.route('/initialize')
 def get_initialize():
+    generate_admin_sales()
     subprocess.call(["../../db/init.sh"])
     return ('', 204)
 
