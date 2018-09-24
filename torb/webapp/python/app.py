@@ -533,39 +533,45 @@ def delete_reserve(event_id, rank, num):
     if not sheet:
         return res_error("invalid_sheet", 404)
 
-    try:
-        conn = dbh()
-        conn.autocommit(False)
-        cur = conn.cursor()
+    for i in range(3):
+        try:
+            conn = dbh()
+            conn.autocommit(False)
+            cur = conn.cursor()
 
-        cur.execute("""
-            SELECT id, user_id, event_id, reserved_at FROM reservations
-            WHERE
-                event_id = %s
-                AND sheet_id = %s
-                AND canceled_at IS NULL
-            GROUP BY event_id
-            HAVING reserved_at = MIN(reserved_at)
-            FOR UPDATE
-            """,
-            [event_id, sheet['id']])
-        reservation = cur.fetchone()
+            cur.execute("""
+                SELECT id, user_id, event_id, reserved_at FROM reservations
+                WHERE
+                    event_id = %s
+                    AND sheet_id = %s
+                    AND canceled_at IS NULL
+                GROUP BY event_id
+                HAVING reserved_at = MIN(reserved_at)
+                FOR UPDATE
+                """,
+                [event_id, sheet['id']])
+            reservation = cur.fetchone()
 
-        if not reservation:
+            if not reservation:
+                conn.rollback()
+                return res_error("not_reserved", 400)
+            if reservation['user_id'] != user['id']:
+                conn.rollback()
+                return res_error("not_permitted", 403)
+
+            cur.execute(
+                "UPDATE reservations SET canceled_at = %s WHERE id = %s",
+                [datetime.utcnow().strftime("%F %T.%f"), reservation['id']])
+            conn.commit()
+            break
+        except MySQLdb.Error as e:
             conn.rollback()
-            return res_error("not_reserved", 400)
-        if reservation['user_id'] != user['id']:
-            conn.rollback()
-            return res_error("not_permitted", 403)
-
-        cur.execute(
-            "UPDATE reservations SET canceled_at = %s WHERE id = %s",
-            [datetime.utcnow().strftime("%F %T.%f"), reservation['id']])
-        conn.commit()
-    except MySQLdb.Error as e:
-        conn.rollback()
-        print(e)
-        return res_error()
+            print(e)
+            if i == 2:
+                return res_error()
+            continue
+        finally:
+            conn.autocommit(True)
 
     return flask.Response(status=204)
 
