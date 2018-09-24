@@ -6,6 +6,7 @@ import os
 import pathlib
 import copy
 import json
+import random
 import subprocess
 from io import StringIO
 import csv
@@ -437,7 +438,7 @@ def post_reserve(event_id):
         conn =  dbh()
         cur = conn.cursor()
         cur.execute("""
-            SELECT * FROM sheets
+            SELECT id, num FROM sheets
             WHERE
                 id NOT IN (
                     SELECT sheet_id
@@ -448,11 +449,10 @@ def post_reserve(event_id):
                     FOR UPDATE
                 )
                 AND `rank` =%s
-            ORDER BY RAND()
-            LIMIT 1
             """,
             [event_id, rank])
-        sheet = cur.fetchone()
+        sheets = cur.fetchall()
+        sheet = random.choice(sheets)
         if not sheet:
             return res_error("sold_out", 409)
         try:
