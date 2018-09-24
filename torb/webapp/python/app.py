@@ -605,10 +605,10 @@ def post_adin_login():
 
     cur = dbh().cursor()
 
-    cur.execute('SELECT *, SHA2(%s, 256) = pass_hash as login_successful FROM administrators WHERE login_name = %s', [login_name, password])
+    cur.execute('SELECT *, SHA2(%s, 256) as input_password FROM administrators WHERE login_name = %s', [login_name, password])
     administrator = cur.fetchone()
 
-    if not administrator or not bool(administrator['login_successful']):
+    if not administrator or not administrator['pass_hash'] == administrator['input_password']:
         return res_error("authentication_failed", 401)
 
     flask.session['administrator_id'] = administrator['id']
