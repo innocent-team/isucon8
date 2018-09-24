@@ -482,16 +482,17 @@ def post_reserve(event_id):
                         FOR UPDATE
                     )
                     AND `rank` =%s
-                ORDER BY id {} LIMIT 1
-                """.format('ASC' if random.random() > 0.5 else 'DESC'),
+                """,
                 [event_id, rank])
             break
         except MySQLdb.Error as e:
             if i == 2:
                 raise e
             continue
-    sheet = cur.fetchone()
-    if not sheet:
+    sheets = cur.fetchall()
+    try:
+        sheet = random.choice(sheets)
+    except IndexError:
         conn.autocommit(True)
         return res_error("sold_out", 409)
     try:
