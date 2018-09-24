@@ -469,20 +469,27 @@ def post_reserve(event_id):
     conn =  dbh()
     cur = conn.cursor()
     conn.autocommit(False)
-    cur.execute("""
-        SELECT id, num FROM sheets
-        WHERE
-            id NOT IN (
-                SELECT sheet_id
-                FROM reservations
+    
+    for i in range(3):
+        try:
+            cur.execute("""
+                SELECT id, num FROM sheets
                 WHERE
-                    event_id = %s
-                    AND canceled_at IS NULL
-                FOR UPDATE
-            )
-            AND `rank` =%s
-        """,
-        [event_id, rank])
+                    id NOT IN (
+                        SELECT sheet_id
+                        FROM reservations
+                        WHERE
+                            event_id = %s
+                            AND canceled_at IS NULL
+                        FOR UPDATE
+                    )
+                    AND `rank` =%s
+                """,
+                [event_id, rank])
+        except MySQLdb.Error as e:
+            if i == 2:
+                raise e
+            continue
     sheets = cur.fetchall()
     try:
         sheet = random.choice(sheets)
