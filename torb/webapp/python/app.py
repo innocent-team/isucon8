@@ -771,6 +771,17 @@ def generate_admin_sales():
         for reservation in cur.fetchall():
             _reservations.append(make_report(reservation))
     else:
+        # fetch canceled reservations
+        cur.execute('''
+            SELECT
+                id, canceled_at
+            FROM reservations
+            WHERE canceled_at >= %s
+            ORDER BY canceled_at ASC
+            FOR UPDATE
+        ''', [_last_updated_at.strftime("%F %T.%f")])
+        canceled = cur.fetchall()
+
         # add new reservations
         cur.execute('''
             SELECT
@@ -788,16 +799,7 @@ def generate_admin_sales():
             _reservations.append(make_report(reservation))
 
         # update canceled reservations
-        cur = dbh().cursor()
-        cur.execute('''
-            SELECT
-                id, canceled_at
-            FROM reservations
-            WHERE canceled_at >= %s
-            ORDER BY canceled_at ASC
-            FOR UPDATE
-        ''', [_last_updated_at.strftime("%F %T.%f")])
-        for row in cur.fetchall():
+        for row in canceled:
             try:
                 _reservations[row['id'] - 1][-1] = row['canceled_at']
             except Exception as e:
