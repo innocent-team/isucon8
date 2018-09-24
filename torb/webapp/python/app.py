@@ -526,10 +526,7 @@ def delete_reserve(event_id, rank, num):
     if not validate_rank(rank):
         return res_error("invalid_rank", 404)
 
-    cur = dbh().cursor()
-    cur.execute('SELECT id FROM sheets WHERE `rank` = %s AND num = %s', [rank, num])
-    sheet = cur.fetchone()
-    if not sheet:
+    if not 1 <= num <= 1000:
         return res_error("invalid_sheet", 404)
 
     try:
@@ -565,6 +562,8 @@ def delete_reserve(event_id, rank, num):
         conn.rollback()
         print(e)
         return res_error()
+    finally:
+        conn.autocommit(True)
 
     return flask.Response(status=204)
 
