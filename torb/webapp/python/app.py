@@ -177,7 +177,7 @@ def get_event(event_id, login_user_id=None, with_detail=True):
     for rank in reserved_per_rank:
         remains = rank_count[rank['rank']] - rank['reserved']
         event['sheets'][rank['rank']]['remains'] = remains
-        event['remains'] += remains
+        event['remains'] = remains
 
     cur.execute("""
         SELECT s.*, r.user_id, r.reserved_at
