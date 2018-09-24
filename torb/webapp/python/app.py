@@ -261,13 +261,13 @@ def validate_sheet(rank, num):
     if not validate_rank(rank):
         return False
 
-    if rank == 'S' and 1 <= num <= 50:
+    if rank == 'S' and 1 <= num <= rank_count['S']:
         return True
-    if rank == 'A' and 1 <= num <= 150:
+    if rank == 'A' and 1 <= num <= rank_count['A']:
         return True
-    if rank == 'B' and 1 <= num <= 200:
+    if rank == 'B' and 1 <= num <= rank_count['B']:
         return True
-    if rank == 'C' and 1 <= num <= 300:
+    if rank == 'C' and 1 <= num <= rank_count['C']:
         return True
 
     return False
