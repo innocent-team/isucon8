@@ -669,9 +669,8 @@ def get_admin_event_sales(event_id):
             cur.execute('select price from events where id = %s', [event_id])
             event_price = cur.fetchone()['price']
             reservations = cur.execute('''
-                SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num, s.price AS sheet_price, %s AS event_price
+                SELECT r.*, %s AS event_price
                 FROM reservations r
-                INNER JOIN sheets s ON s.id = r.sheet_id
                 WHERE
                     r.event_id = %s
                 ORDER BY reserved_at ASC
@@ -688,6 +687,8 @@ def get_admin_event_sales(event_id):
         if reservation['canceled_at']:
             canceled_at = reservation['canceled_at'].isoformat()+"Z"
         else: canceled_at = ''
+        rank = calculate_rank(reservation['sheet_id'])
+        sheet_idx = reservation['sheet_id'] - 1
         reports.append({
             "reservation_id": reservation['id'],
             "event_id":       event_id,
@@ -709,11 +710,8 @@ def get_admin_sales():
     reservations = cur.execute('''
         SELECT
             r.*,
-            s.rank AS sheet_rank, s.num AS sheet_num, s.price AS sheet_price,
             e.id AS event_id, e.price AS event_price
         FROM reservations r
-        INNER JOIN sheets s
-        ON s.id = r.sheet_id
         INNER JOIN events e
         ON e.id = r.event_id
         ORDER BY reserved_at ASC
@@ -726,15 +724,17 @@ def get_admin_sales():
         if reservation['canceled_at']:
             canceled_at = reservation['canceled_at'].isoformat()+"Z"
         else: canceled_at = ''
+        rank = calculate_rank(reservation['sheet_id'])
+        sheet_idx = reservation['sheet_id'] - 1
         reports.append({
             "reservation_id": reservation['id'],
             "event_id":       reservation['event_id'],
-            "rank":           reservation['sheet_rank'],
-            "num":            reservation['sheet_num'],
+            "rank":           rank,
+            "num":            sheets()[sheet_idx]['num'],
             "user_id":        reservation['user_id'],
             "sold_at":        reservation['reserved_at'].isoformat()+"Z",
             "canceled_at":    canceled_at,
-            "price":          reservation['event_price'] + reservation['sheet_price'],
+            "price":          reservation['event_price'] + sheets()[sheet_idx]['price'],
         })
     return render_report_csv(reports)
 
