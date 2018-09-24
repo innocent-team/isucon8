@@ -370,10 +370,8 @@ def get_users(user_id):
 
     user['recent_reservations'] = recent_reservations
     cur.execute("""
-        SELECT IFNULL(SUM(e.price + s.price), 0) AS total_price
+        SELECT r.sheet_id, e.price
         FROM reservations r
-        INNER JOIN sheets s
-        ON s.id = r.sheet_id
         INNER JOIN events e
         ON e.id = r.event_id
         WHERE
@@ -381,8 +379,10 @@ def get_users(user_id):
             AND r.canceled_at IS NULL
         """,
         [user['id']])
-    row = cur.fetchone()
-    user['total_price'] = int(row['total_price'])
+    
+    user['total_price'] = 0
+    for row in cur.fetchall():
+        user['total_price'] += sheets()[row['sheet_id'] - 1]['price']
 
     cur.execute("""
         SELECT event_id
