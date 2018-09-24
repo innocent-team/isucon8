@@ -69,7 +69,7 @@ def login_required(f):
 def admin_login_required(f):
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
-        if not get_login_administrator():
+        if 'administrator_id' not in flask.session:
             return res_error('admin_login_required', 401)
         return f(*args, **kwargs)
     return wrapper
