@@ -508,6 +508,8 @@ def post_reserve(event_id):
     finally:
         conn.autocommit(True)
 
+    global _last_updated_at
+    _last_updated_at = datetime.utcnow()
     content = jsonify({
         "id": reservation_id,
         "sheet_rank": rank,
@@ -571,6 +573,8 @@ def delete_reserve(event_id, rank, num):
         finally:
             conn.autocommit(True)
 
+    global _last_updated_at
+    _last_updated_at = datetime.utcnow()
     return flask.Response(status=204)
 
 
@@ -721,40 +725,89 @@ def get_admin_event_sales(event_id):
     return render_report_csv(reports)
 
 
+_reservations = []
+_last_updated_at = None
+
+def make_report(reservation):
+    if reservation['canceled_at']:
+        canceled_at = reservation['canceled_at'].isoformat()+"Z"
+    else: canceled_at = ''
+    rank = calculate_rank(reservation['sheet_id'])
+    sheet_idx = reservation['sheet_id'] - 1
+    return [
+        reservation['id'],
+        reservation['event_id'],
+        rank,
+        sheets()[sheet_idx]['num'],
+        reservation['event_price'] + sheets()[sheet_idx]['price'],
+        reservation['user_id'],
+        reservation['reserved_at'].isoformat()+"Z",
+        canceled_at,
+    ]
+
+def generate_admin_sales():
+    global _reservations
+    global _last_updated_at
+
+    if _last_updated_at is None:
+        # initialize
+        _last_updated_at = datetime.utcnow()
+
+        cur = dbh().cursor()
+        cur.execute('''
+            SELECT
+                r.*,
+                e.id AS event_id, e.price AS event_price
+            FROM reservations r
+            INNER JOIN events e
+            ON e.id = r.event_id
+            ORDER BY reserved_at ASC
+            FOR UPDATE
+        ''')
+
+        for reservation in cur.fetchall():
+            _reservations.append(make_report(reservation))
+    else:
+        # add new reservations
+        cur.execute('''
+            SELECT
+                r.*,
+                e.id AS event_id, e.price AS event_price
+            FROM reservations r
+            INNER JOIN events e
+            ON e.id = r.event_id
+            WHERE reserved_at > %s
+            ORDER BY reserved_at ASC
+            FOR UPDATE
+        ''', [_last_updated_at.strftime("%F %T.%f")])
+
+        for reservation in cur.fetchall():
+            _reservations.append(make_report(reservation))
+
+        # update canceled reservations
+        cur = dbh().cursor()
+        cur.execute('''
+            SELECT
+                id, canceled_at,
+            FROM reservations
+            WHERE canceled_at > %s
+            ORDER BY reserved_at ASC
+            FOR UPDATE
+        ''', [_last_updated_at.strftime("%F %T.%f")])
+        for row in cur.fetchall():
+            _reservations[row['id'] - 1]['canceled_at'] = row['canceled_at']
+
+        _last_updated_at = datetime.utcnow()
+
+
+
 @app.route('/admin/api/reports/sales')
 @admin_login_required
 def get_admin_sales():
-    cur = dbh().cursor()
-    reservations = cur.execute('''
-        SELECT
-            r.*,
-            e.id AS event_id, e.price AS event_price
-        FROM reservations r
-        INNER JOIN events e
-        ON e.id = r.event_id
-        ORDER BY reserved_at ASC
-        FOR UPDATE
-    ''')
-    reservations = list(cur.fetchall())
+    global _reservations
+    generate_admin_sales()
 
-    def make_reports():
-        for reservation in reservations:
-            if reservation['canceled_at']:
-                canceled_at = reservation['canceled_at'].isoformat()+"Z"
-            else: canceled_at = ''
-            rank = calculate_rank(reservation['sheet_id'])
-            sheet_idx = reservation['sheet_id'] - 1
-            yield [
-                reservation['id'],
-                reservation['event_id'],
-                rank,
-                sheets()[sheet_idx]['num'],
-                reservation['event_price'] + sheets()[sheet_idx]['price'],
-                reservation['user_id'],
-                reservation['reserved_at'].isoformat()+"Z",
-                canceled_at,
-            ]
-    return render_report_csv(make_reports())
+    return render_report_csv(_reservations)
 
 
 if __name__ == "__main__":
