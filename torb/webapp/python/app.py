@@ -522,6 +522,16 @@ def post_reserve(event_id):
         "sheet_num": sheet['num']})
     return flask.Response(content, status=202, mimetype='application/json')
 
+def calculate_sheet_id(rank, num):
+    if rank == 'S':
+        return num
+    elif rank == 'A':
+        return num + rank_count['S']
+    elif rank == 'B':
+        return num + rank_count['S'] + rank_count['A']
+    elif rank == 'C':
+        return num + rank_count['S'] + rank_count['A'] + rank_count['B']
+
 
 @app.route('/api/events/<int:event_id>/sheets/<rank>/<int:num>/reservation', methods=['DELETE'])
 @login_required
@@ -534,6 +544,8 @@ def delete_reserve(event_id, rank, num):
         return res_error("invalid_rank", 404)
     if not validate_sheet(rank, num):
         return res_error("invalid_sheet", 404)
+
+    sheet_id = calculate_sheet_id(rank, num)
 
     for i in range(3):
         try:
@@ -551,7 +563,7 @@ def delete_reserve(event_id, rank, num):
                 HAVING reserved_at = MIN(reserved_at)
                 FOR UPDATE
                 """,
-                [event_id, sheet['id']])
+                [event_id, sheet_id])
             reservation = cur.fetchone()
 
             if not reservation:
