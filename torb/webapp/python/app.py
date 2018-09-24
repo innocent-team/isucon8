@@ -258,7 +258,7 @@ def validate_rank(rank):
 
 
 def validate_sheet(rank, num):
-    if not validate_rank(rank)
+    if not validate_rank(rank):
         return False
 
     if rank == 'S' and 1 <= num <= 50:
