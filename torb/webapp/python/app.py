@@ -218,7 +218,7 @@ def get_event(event_id, login_user_id=None, with_detail=True):
         event['remains'] -= 1
 
         if with_detail:
-            if login_user_id and sheet['user_id'] == login_user_id:
+            if login_user_id and reserved_sheet['user_id'] == login_user_id:
                 event['sheets'][rank]['detail'][sheet_num]['mine'] = True
             event['sheets'][rank]['detail'][sheet_num_index]['reserved'] = True
             event['sheets'][rank]['detail'][sheet_num_index]['reserved_at'] = int(reserved_sheet['reserved_at'].replace(tzinfo=timezone.utc).timestamp())
