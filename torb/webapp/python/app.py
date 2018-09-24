@@ -793,7 +793,7 @@ def generate_admin_sales():
             FOR UPDATE
         ''', [_last_updated_at.strftime("%F %T.%f")])
         for row in cur.fetchall():
-            _reservations[row['id'] - 1]['canceled_at'] = row['canceled_at']
+            _reservations[row['id'] - 1][-1] = row['canceled_at']
 
         _last_updated_at = datetime.utcnow()
 
