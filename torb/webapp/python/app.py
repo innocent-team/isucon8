@@ -486,6 +486,7 @@ def post_reserve(event_id):
                     AND `rank` =%s
                 """,
                 [event_id, rank])
+            break
         except MySQLdb.Error as e:
             if i == 2:
                 raise e
