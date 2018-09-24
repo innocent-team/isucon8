@@ -482,6 +482,7 @@ def post_reserve(event_id):
                         FOR UPDATE
                     )
                     AND `rank` =%s
+                LIMIT 1
                 """,
                 [event_id, rank])
             break
@@ -489,10 +490,8 @@ def post_reserve(event_id):
             if i == 2:
                 raise e
             continue
-    sheets = cur.fetchall()
-    try:
-        sheet = random.choice(sheets)
-    except IndexError:
+    sheet = cur.fetchone()
+    if not sheet:
         conn.autocommit(True)
         return res_error("sold_out", 409)
     try:
