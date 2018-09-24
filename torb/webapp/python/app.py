@@ -793,7 +793,12 @@ def generate_admin_sales():
             FOR UPDATE
         ''', [_last_updated_at.strftime("%F %T.%f")])
         for row in cur.fetchall():
-            _reservations[row['id'] - 1][-1] = row['canceled_at']
+            try:
+                _reservations[row['id'] - 1][-1] = row['canceled_at']
+            except Exception as e:
+                print("len(_reservations) = {}".format(len(_reservations)))
+                print("row['id'] - 1 = {}".format(row['id'] - 1))
+                raise e
 
         _last_updated_at = datetime.utcnow()
 
