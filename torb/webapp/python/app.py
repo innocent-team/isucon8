@@ -508,8 +508,6 @@ def post_reserve(event_id):
     finally:
         conn.autocommit(True)
 
-    global _last_updated_at
-    _last_updated_at = datetime.utcnow()
     content = jsonify({
         "id": reservation_id,
         "sheet_rank": rank,
@@ -776,10 +774,10 @@ def generate_admin_sales():
             FROM reservations r
             INNER JOIN events e
             ON e.id = r.event_id
-            WHERE reserved_at > %s
+            WHERE id > %s
             ORDER BY reserved_at ASC
             FOR UPDATE
-        ''', [_last_updated_at.strftime("%F %T.%f")])
+        ''', [_reservations[-1][0]])
 
         for reservation in cur.fetchall():
             _reservations.append(make_report(reservation))
@@ -790,7 +788,7 @@ def generate_admin_sales():
             SELECT
                 id, canceled_at
             FROM reservations
-            WHERE canceled_at > %s
+            WHERE canceled_at >= %s
             ORDER BY reserved_at ASC
             FOR UPDATE
         ''', [_last_updated_at.strftime("%F %T.%f")])
