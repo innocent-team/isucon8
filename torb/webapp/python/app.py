@@ -263,7 +263,7 @@ def validate_rank(rank):
 def render_report_csv(reports):
     keys = ["reservation_id", "event_id", "rank", "num", "price", "user_id", "sold_at", "canceled_at"]
 
-    body = itertools.chain(keys, ((report[key] for key in keys) for report in reports))
+    body = itertools.chain([keys], ((report[key] for key in keys) for report in reports))
 
     f = StringIO()
     writer = csv.writer(f)
