@@ -159,6 +159,27 @@ def get_event(event_id, login_user_id=None, with_detail=True):
         event["sheets"][rank] = rank_info
 
     cur.execute("""
+    select `rank`, count(reserved_at) as reserved
+    from (
+      select s.`rank`, r.reserved_at
+      from sheets s
+      left join reservations r
+      on s.id = r.sheet_id
+      and r.canceled_at is null
+      and r.event_id = %s
+      group by s.id
+      having ifnull(r.reserved_at = min(r.reserved_at), true)
+    ) t
+    group by 1
+    """, [event_id])
+    reserved_per_rank = cur.fetchall()
+
+    for rank in reserved_per_rank:
+        remains = rank_count[rank['rank']] - rank['reserved']
+        event['sheets'][rank['rank']]['remains'] = remains
+        event['remains'] += remains
+
+    cur.execute("""
         SELECT s.*, r.user_id, r.reserved_at
         FROM sheets s
         LEFT JOIN reservations r
@@ -177,9 +198,6 @@ def get_event(event_id, login_user_id=None, with_detail=True):
                     sheet['mine'] = True
                 sheet['reserved'] = True
                 sheet['reserved_at'] = int(sheet['reserved_at'].replace(tzinfo=timezone.utc).timestamp())
-        else:
-            event['remains'] += 1
-            event['sheets'][sheet['rank']]['remains'] += 1
 
         if with_detail:
             event['sheets'][sheet['rank']]['detail'].append(sheet)
