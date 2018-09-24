@@ -434,39 +434,37 @@ def post_reserve(event_id):
     sheet = None
     reservation_id = 0
 
-    while True:
-        conn =  dbh()
+    conn =  dbh()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, num FROM sheets
+        WHERE
+            id NOT IN (
+                SELECT sheet_id
+                FROM reservations
+                WHERE
+                    event_id = %s
+                    AND canceled_at IS NULL
+                FOR UPDATE
+            )
+            AND `rank` =%s
+        """,
+        [event_id, rank])
+    sheets = cur.fetchall()
+    sheet = random.choice(sheets)
+    if not sheet:
+        return res_error("sold_out", 409)
+    try:
+        conn.autocommit(False)
         cur = conn.cursor()
-        cur.execute("""
-            SELECT id, num FROM sheets
-            WHERE
-                id NOT IN (
-                    SELECT sheet_id
-                    FROM reservations
-                    WHERE
-                        event_id = %s
-                        AND canceled_at IS NULL
-                    FOR UPDATE
-                )
-                AND `rank` =%s
-            """,
-            [event_id, rank])
-        sheets = cur.fetchall()
-        sheet = random.choice(sheets)
-        if not sheet:
-            return res_error("sold_out", 409)
-        try:
-            conn.autocommit(False)
-            cur = conn.cursor()
-            cur.execute(
-                "INSERT INTO reservations (event_id, sheet_id, user_id, reserved_at) VALUES (%s, %s, %s, %s)",
-                [event_id, sheet['id'], user['id'], datetime.utcnow().strftime("%F %T.%f")])
-            reservation_id = cur.lastrowid
-            conn.commit()
-        except MySQLdb.Error as e:
-            conn.rollback()
-            print(e)
-        break
+        cur.execute(
+            "INSERT INTO reservations (event_id, sheet_id, user_id, reserved_at) VALUES (%s, %s, %s, %s)",
+            [event_id, sheet['id'], user['id'], datetime.utcnow().strftime("%F %T.%f")])
+        reservation_id = cur.lastrowid
+        conn.commit()
+    except MySQLdb.Error as e:
+        conn.rollback()
+        print(e)
 
     content = jsonify({
         "id": reservation_id,
