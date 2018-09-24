@@ -788,7 +788,7 @@ def generate_admin_sales():
         cur = dbh().cursor()
         cur.execute('''
             SELECT
-                id, canceled_at,
+                id, canceled_at
             FROM reservations
             WHERE canceled_at > %s
             ORDER BY reserved_at ASC
