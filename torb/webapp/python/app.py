@@ -35,10 +35,10 @@ class CustomFlask(flask.Flask):
 
 app = CustomFlask(__name__, static_folder=str(static_folder), static_url_path='')
 app.config['SECRET_KEY'] = 'tagomoris'
-app.secret_key = 'tagomoris'
 SESSION_TYPE = 'memcached'
 SESSION_MEMCACHED = 'isucon2:11211'
-Session(app)
+sess = Session()
+sess.init_app(app)
 
 
 if not os.path.exists(str(icons_folder)):
