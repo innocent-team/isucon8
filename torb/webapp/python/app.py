@@ -534,6 +534,8 @@ def delete_reserve(event_id, rank, num):
     if not sheet:
         return res_error("invalid_sheet", 404)
 
+    canceled_at = datetime.utcnow()
+
     for i in range(3):
         try:
             conn = dbh()
@@ -562,7 +564,7 @@ def delete_reserve(event_id, rank, num):
 
             cur.execute(
                 "UPDATE reservations SET canceled_at = %s WHERE id = %s",
-                [datetime.utcnow().strftime("%F %T.%f"), reservation['id']])
+                [canceled_at.strftime("%F %T.%f"), reservation['id']])
             conn.commit()
             break
         except MySQLdb.Error as e:
@@ -575,7 +577,7 @@ def delete_reserve(event_id, rank, num):
             conn.autocommit(True)
 
     global _last_updated_at
-    _last_updated_at = datetime.utcnow()
+    _last_updated_at = canceled_at
     return flask.Response(status=204)
 
 
